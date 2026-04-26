@@ -1,752 +1,948 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ZXScope — QASM Circuit Optimizer</title>
-<style>
-  /* ── Reset & base ─────────────────────────────────────────────────────── */
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --bg:       #ffffff;
-    --surface:  #f5f5f5;
-    --card:     #fafafa;
-    --border:   #d0d0d0;
-    --accent:   #000000;
-    --accent2:  #333333;
-    --success:  #1a1a1a;
-    --warning:  #555555;
-    --danger:   #000000;
-    --text:     #111111;
-    --muted:    #666666;
-    --code-bg:  #f0f0f0;
-    --mono: "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
-    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-    --radius: 8px;
-    --radius-lg: 12px;
-  }
-
-  html { font-size: 15px; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-    line-height: 1.6;
-    min-height: 100vh;
-  }
-
-  /* ── Header ───────────────────────────────────────────────────────────── */
-  header {
-    border-bottom: 1px solid var(--border);
-    padding: 1.25rem 2rem;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    background: var(--surface);
-  }
-
-  .logo {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    text-decoration: none;
-  }
-
-  .logo-icon {
-    width: 36px; height: 36px;
-    background: #111111;
-    border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.1rem;
-    flex-shrink: 0;
-  }
-
-  .logo-text { font-size: 1.2rem; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
-  .logo-text span { color: var(--accent); }
-
-  .header-meta {
-    margin-left: auto;
-    font-size: 0.8rem;
-    color: var(--muted);
-    display: flex;
-    gap: 1.25rem;
-    align-items: center;
-  }
-
-  .badge {
-    background: color-mix(in srgb, var(--accent) 15%, transparent);
-    color: var(--accent);
-    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-    border-radius: 20px;
-    padding: 0.2rem 0.65rem;
-    font-size: 0.72rem;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-  }
-
-  /* ── Layout ───────────────────────────────────────────────────────────── */
-  main {
-    max-width: 1100px;
-    margin: 0 auto;
-    padding: 2rem 1.5rem 4rem;
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
-  }
-
-  /* ── Input panel ──────────────────────────────────────────────────────── */
-  .panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-  }
-
-  .panel-header {
-    padding: 1rem 1.25rem 0.75rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-  }
-
-  .panel-title {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-
-  /* ── Preset bar ───────────────────────────────────────────────────────── */
-  .preset-bar {
-    display: flex;
-    gap: 0.5rem;
-    padding: 0.75rem 1.25rem;
-    border-bottom: 1px solid var(--border);
-    flex-wrap: wrap;
-    align-items: center;
-  }
-
-  .preset-label {
-    font-size: 0.75rem;
-    color: var(--muted);
-    font-weight: 500;
-    margin-right: 0.25rem;
-  }
-
-  .preset-btn {
-    background: var(--card);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 0.3rem 0.8rem;
-    font-size: 0.8rem;
-    font-family: var(--mono);
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s, color 0.15s;
-    white-space: nowrap;
-  }
-
-  .preset-btn:hover {
-    background: color-mix(in srgb, var(--accent) 12%, var(--card));
-    border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
-    color: var(--accent);
-  }
-
-  /* ── Editor ───────────────────────────────────────────────────────────── */
-  .editor-wrap {
-    position: relative;
-  }
-
-  #qasm-input {
-    width: 100%;
-    min-height: 220px;
-    background: var(--code-bg);
-    color: var(--text);
-    font-family: var(--mono);
-    font-size: 0.82rem;
-    line-height: 1.6;
-    border: none;
-    outline: none;
-    resize: vertical;
-    padding: 1rem 1.25rem;
-    tab-size: 2;
-    caret-color: var(--accent);
-  }
-
-  #qasm-input::placeholder { color: var(--muted); opacity: 0.6; }
-
-  .editor-actions {
-    display: flex;
-    gap: 0.5rem;
-    padding: 0.6rem 1.25rem;
-    border-top: 1px solid var(--border);
-    background: var(--surface);
-    align-items: center;
-  }
-
-  .btn-ghost {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    border-radius: 6px;
-    padding: 0.3rem 0.75rem;
-    font-size: 0.8rem;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    transition: border-color 0.15s, color 0.15s, background 0.15s;
-    white-space: nowrap;
-  }
-
-  .btn-ghost:hover {
-    border-color: var(--muted);
-    color: var(--text);
-    background: var(--card);
-  }
-
-  .btn-ghost input[type="file"] { display: none; }
-
-  .char-count {
-    margin-left: auto;
-    font-size: 0.73rem;
-    color: var(--muted);
-    font-family: var(--mono);
-  }
-
-  /* ── Optimize button ──────────────────────────────────────────────────── */
-  #optimize-btn {
-    width: 100%;
-    padding: 0.9rem 1.5rem;
-    background: var(--accent);
-    color: #ffffff;
-    font-weight: 700;
-    font-size: 0.95rem;
-    border: none;
-    border-radius: var(--radius);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.6rem;
-    transition: background 0.15s, transform 0.1s;
-    letter-spacing: 0.01em;
-  }
-
-  #optimize-btn:hover:not(:disabled) { background: var(--accent2); }
-  #optimize-btn:active:not(:disabled) { transform: scale(0.99); }
-  #optimize-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-  .spinner {
-    width: 18px; height: 18px;
-    border: 2px solid rgba(255,255,255,0.3);
-    border-top-color: #ffffff;
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-    display: none;
-  }
-
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ── Results section ──────────────────────────────────────────────────── */
-  #results {
-    display: none;
-    flex-direction: column;
-    gap: 1.5rem;
-    animation: fadeIn 0.3s ease;
-  }
-
-  #results.visible { display: flex; }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  .section-heading {
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    margin-bottom: 0.75rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
-
-  .section-heading::after {
-    content: "";
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-  }
-
-  /* ── Metric cards ─────────────────────────────────────────────────────── */
-  .metrics-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-  }
-
-  .metric-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 1.25rem 1.5rem;
-    opacity: 0;
-    transform: translateY(12px);
-    transition: opacity 0.4s ease, transform 0.4s ease;
-  }
-
-  .metric-card.animate {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  .metric-label {
-    font-size: 0.75rem;
-    color: var(--muted);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-bottom: 0.6rem;
-  }
-
-  .metric-value {
-    font-size: 2.4rem;
-    font-weight: 800;
-    font-family: var(--mono);
-    color: var(--text);
-    line-height: 1;
-    margin-bottom: 0.6rem;
-    letter-spacing: -0.03em;
-  }
-
-  .metric-detail {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-
-  .metric-before {
-    font-size: 0.8rem;
-    color: var(--muted);
-    font-family: var(--mono);
-  }
-
-  .metric-pct {
-    font-size: 0.8rem;
-    font-weight: 700;
-    font-family: var(--mono);
-    padding: 0.1rem 0.5rem;
-    border-radius: 4px;
-  }
-
-  .metric-pct.improved {
-    color: #111111;
-    background: #e8e8e8;
-    border: 1px solid #aaaaaa;
-  }
-
-  .metric-pct.regressed {
-    color: #111111;
-    background: #e8e8e8;
-    border: 1px solid #aaaaaa;
-  }
-
-  .metric-pct.unchanged {
-    color: var(--muted);
-    background: #eeeeee;
-    border: 1px solid #cccccc;
-  }
-
-  .metric-bar {
-    margin-top: 0.85rem;
-    height: 4px;
-    background: var(--border);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-
-  .metric-bar-fill {
-    height: 100%;
-    border-radius: 2px;
-    background: #111111;
-    width: 0;
-    transition: width 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  }
-
-  .metric-bar-fill.regressed { background: #555555; }
-
-  /* ── ZX graph comparison ──────────────────────────────────────────────── */
-  .zx-graphs-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-  }
-
-  .zx-graph-panel {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .zx-graph-header {
-    padding: 0.6rem 1rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--surface);
-    flex-shrink: 0;
-  }
-
-  .zx-graph-title {
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-  }
-
-  .zx-node-count {
-    font-size: 0.72rem;
-    font-family: var(--mono);
-    color: var(--muted);
-  }
-
-  .zx-graph-container {
-    overflow: auto;
-    min-height: 160px;
-    background: #ffffff;
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .zx-graph-container svg { display: block; }
-
-  .zx-legend {
-    display: flex;
-    gap: 1rem;
-    padding: 0.5rem 1rem;
-    border-top: 1px solid var(--border);
-    flex-wrap: wrap;
-    background: var(--surface);
-  }
-
-  .zx-legend-item {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    font-size: 0.7rem;
-    color: var(--muted);
-  }
-
-  .zx-legend-dot {
-    width: 10px; height: 10px;
-    border-radius: 50%;
-    border: 1.5px solid;
-    flex-shrink: 0;
-  }
-
-  @media (max-width: 680px) {
-    .zx-graphs-grid { grid-template-columns: 1fr; }
-  }
-
-  /* ── QASM output ──────────────────────────────────────────────────────── */
-  .qasm-output-wrap {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-  }
-
-  .qasm-output-header {
-    padding: 0.7rem 1.25rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: var(--surface);
-  }
-
-  .qasm-output-title {
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: var(--muted);
-  }
-
-  .copy-btn {
-    background: var(--card);
-    border: 1px solid var(--border);
-    color: var(--muted);
-    border-radius: 6px;
-    padding: 0.25rem 0.7rem;
-    font-size: 0.75rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    transition: all 0.15s;
-  }
-
-  .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
-  .copy-btn.copied { border-color: var(--success); color: var(--success); }
-
-  #qasm-output {
-    margin: 0;
-    padding: 1rem 1.25rem;
-    background: var(--code-bg);
-    color: #111111;
-    font-family: var(--mono);
-    font-size: 0.8rem;
-    line-height: 1.65;
-    overflow-x: auto;
-    white-space: pre;
-    max-height: 400px;
-    overflow-y: auto;
-  }
-
-  /* ── Error toast ──────────────────────────────────────────────────────── */
-  #error-toast {
-    position: fixed;
-    bottom: 1.5rem;
-    left: 50%;
-    transform: translateX(-50%) translateY(120px);
-    background: #f5f5f5;
-    border: 1px solid #111111;
-    color: #111111;
-    border-radius: var(--radius);
-    padding: 0.75rem 1.25rem;
-    font-size: 0.85rem;
-    max-width: 600px;
-    width: calc(100% - 3rem);
-    display: flex;
-    align-items: flex-start;
-    gap: 0.6rem;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    z-index: 100;
-  }
-
-  #error-toast.show { transform: translateX(-50%) translateY(0); }
-
-  .toast-icon { flex-shrink: 0; font-size: 1rem; margin-top: 1px; }
-  .toast-msg { flex: 1; line-height: 1.5; word-break: break-word; }
-  .toast-close {
-    flex-shrink: 0;
-    background: none;
-    border: none;
-    color: #111111;
-    cursor: pointer;
-    font-size: 1rem;
-    opacity: 0.7;
-    padding: 0;
-    line-height: 1;
-  }
-  .toast-close:hover { opacity: 1; }
-
-  /* ── Scrollbar ────────────────────────────────────────────────────────── */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
-
-  /* ── Responsive ───────────────────────────────────────────────────────── */
-  @media (max-width: 680px) {
-    header { padding: 1rem; }
-    main { padding: 1rem 1rem 3rem; }
-    .metrics-grid { grid-template-columns: 1fr; }
-    .header-meta { display: none; }
-  }
-</style>
-</head>
-<body>
-
-<header>
-  <div class="logo">
-    <div class="logo-icon">⚛</div>
-    <span class="logo-text">ZX<span>Scope</span></span>
-  </div>
-  <div class="header-meta">
-    <span class="badge">pyzx</span>
-    <span>ZX-calculus circuit optimizer</span>
-  </div>
-</header>
-
-<main>
-
-  <!-- ── Input panel ───────────────────────────────────────────────────── -->
-  <div class="panel">
-    <div class="panel-header">
-      <span class="panel-title">Input Circuit</span>
-    </div>
-
-    <div class="preset-bar">
-      <span class="preset-label">Presets:</span>
-      <button class="preset-btn" data-preset="toffoli">Toffoli gate</button>
-      <button class="preset-btn" data-preset="qft3">3-qubit QFT</button>
-      <button class="preset-btn" data-preset="clifford_t">Clifford+T adder</button>
-    </div>
-
-    <div class="editor-wrap">
-      <textarea id="qasm-input" spellcheck="false"
-        placeholder="Paste OpenQASM 2.0 here…
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ZXScope — QASM Circuit Optimizer</title>
+    <style>
+      /* ── Reset & base ─────────────────────────────────────────────────────── */
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #ffffff;
+        --surface: #f5f5f5;
+        --card: #fafafa;
+        --border: #d0d0d0;
+        --accent: #000000;
+        --accent2: #333333;
+        --success: #1a1a1a;
+        --warning: #555555;
+        --danger: #000000;
+        --text: #111111;
+        --muted: #666666;
+        --code-bg: #f0f0f0;
+        --mono:
+          "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace,
+          monospace;
+        --sans:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        --radius: 8px;
+        --radius-lg: 12px;
+      }
+
+      html {
+        font-size: 15px;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: var(--sans);
+        line-height: 1.6;
+        min-height: 100vh;
+      }
+
+      /* ── Header ───────────────────────────────────────────────────────────── */
+      header {
+        border-bottom: 1px solid var(--border);
+        padding: 1.25rem 2rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        background: var(--surface);
+      }
+
+      .logo {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        text-decoration: none;
+      }
+
+      .logo-icon {
+        width: 36px;
+        height: 36px;
+        background: #111111;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+      }
+
+      .logo-text {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--text);
+        letter-spacing: -0.02em;
+      }
+      .logo-text span {
+        color: var(--accent);
+      }
+
+      .header-meta {
+        margin-left: auto;
+        font-size: 0.8rem;
+        color: var(--muted);
+        display: flex;
+        gap: 1.25rem;
+        align-items: center;
+      }
+
+      .badge {
+        background: color-mix(in srgb, var(--accent) 15%, transparent);
+        color: var(--accent);
+        border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+        border-radius: 20px;
+        padding: 0.2rem 0.65rem;
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+      }
+
+      /* ── Layout ───────────────────────────────────────────────────────────── */
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 2rem 1.5rem 4rem;
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+      }
+
+      /* ── Input panel ──────────────────────────────────────────────────────── */
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+      }
+
+      .panel-header {
+        padding: 1rem 1.25rem 0.75rem;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .panel-title {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      /* ── Preset bar ───────────────────────────────────────────────────────── */
+      .preset-bar {
+        display: flex;
+        gap: 0.5rem;
+        padding: 0.75rem 1.25rem;
+        border-bottom: 1px solid var(--border);
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .preset-label {
+        font-size: 0.75rem;
+        color: var(--muted);
+        font-weight: 500;
+        margin-right: 0.25rem;
+      }
+
+      .preset-btn {
+        background: var(--card);
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: 6px;
+        padding: 0.3rem 0.8rem;
+        font-size: 0.8rem;
+        font-family: var(--mono);
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          border-color 0.15s,
+          color 0.15s;
+        white-space: nowrap;
+      }
+
+      .preset-btn:hover {
+        background: color-mix(in srgb, var(--accent) 12%, var(--card));
+        border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+        color: var(--accent);
+      }
+
+      /* ── Editor ───────────────────────────────────────────────────────────── */
+      .editor-wrap {
+        position: relative;
+      }
+
+      #qasm-input {
+        width: 100%;
+        min-height: 220px;
+        background: var(--code-bg);
+        color: var(--text);
+        font-family: var(--mono);
+        font-size: 0.82rem;
+        line-height: 1.6;
+        border: none;
+        outline: none;
+        resize: vertical;
+        padding: 1rem 1.25rem;
+        tab-size: 2;
+        caret-color: var(--accent);
+      }
+
+      #qasm-input::placeholder {
+        color: var(--muted);
+        opacity: 0.6;
+      }
+
+      .editor-actions {
+        display: flex;
+        gap: 0.5rem;
+        padding: 0.6rem 1.25rem;
+        border-top: 1px solid var(--border);
+        background: var(--surface);
+        align-items: center;
+      }
+
+      .btn-ghost {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        border-radius: 6px;
+        padding: 0.3rem 0.75rem;
+        font-size: 0.8rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        transition:
+          border-color 0.15s,
+          color 0.15s,
+          background 0.15s;
+        white-space: nowrap;
+      }
+
+      .btn-ghost:hover {
+        border-color: var(--muted);
+        color: var(--text);
+        background: var(--card);
+      }
+
+      .btn-ghost input[type="file"] {
+        display: none;
+      }
+
+      .char-count {
+        margin-left: auto;
+        font-size: 0.73rem;
+        color: var(--muted);
+        font-family: var(--mono);
+      }
+
+      /* ── Optimize button ──────────────────────────────────────────────────── */
+      #optimize-btn {
+        width: 100%;
+        padding: 0.9rem 1.5rem;
+        background: var(--accent);
+        color: #ffffff;
+        font-weight: 700;
+        font-size: 0.95rem;
+        border: none;
+        border-radius: var(--radius);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.6rem;
+        transition:
+          background 0.15s,
+          transform 0.1s;
+        letter-spacing: 0.01em;
+      }
+
+      #optimize-btn:hover:not(:disabled) {
+        background: var(--accent2);
+      }
+      #optimize-btn:active:not(:disabled) {
+        transform: scale(0.99);
+      }
+      #optimize-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .spinner {
+        width: 18px;
+        height: 18px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #ffffff;
+        border-radius: 50%;
+        animation: spin 0.7s linear infinite;
+        display: none;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* ── Results section ──────────────────────────────────────────────────── */
+      #results {
+        display: none;
+        flex-direction: column;
+        gap: 1.5rem;
+        animation: fadeIn 0.3s ease;
+      }
+
+      #results.visible {
+        display: flex;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .section-heading {
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .section-heading::after {
+        content: "";
+        flex: 1;
+        height: 1px;
+        background: var(--border);
+      }
+
+      /* ── Metric cards ─────────────────────────────────────────────────────── */
+      .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+      }
+
+      .metric-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 1.25rem 1.5rem;
+        opacity: 0;
+        transform: translateY(12px);
+        transition:
+          opacity 0.4s ease,
+          transform 0.4s ease;
+      }
+
+      .metric-card.animate {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .metric-label {
+        font-size: 0.75rem;
+        color: var(--muted);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 0.6rem;
+      }
+
+      .metric-value {
+        font-size: 2.4rem;
+        font-weight: 800;
+        font-family: var(--mono);
+        color: var(--text);
+        line-height: 1;
+        margin-bottom: 0.6rem;
+        letter-spacing: -0.03em;
+      }
+
+      .metric-detail {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .metric-before {
+        font-size: 0.8rem;
+        color: var(--muted);
+        font-family: var(--mono);
+      }
+
+      .metric-pct {
+        font-size: 0.8rem;
+        font-weight: 700;
+        font-family: var(--mono);
+        padding: 0.1rem 0.5rem;
+        border-radius: 4px;
+      }
+
+      .metric-pct.improved {
+        color: #111111;
+        background: #e8e8e8;
+        border: 1px solid #aaaaaa;
+      }
+
+      .metric-pct.regressed {
+        color: #111111;
+        background: #e8e8e8;
+        border: 1px solid #aaaaaa;
+      }
+
+      .metric-pct.unchanged {
+        color: var(--muted);
+        background: #eeeeee;
+        border: 1px solid #cccccc;
+      }
+
+      .metric-bar {
+        margin-top: 0.85rem;
+        height: 4px;
+        background: var(--border);
+        border-radius: 2px;
+        overflow: hidden;
+      }
+
+      .metric-bar-fill {
+        height: 100%;
+        border-radius: 2px;
+        background: #111111;
+        width: 0;
+        transition: width 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      }
+
+      .metric-bar-fill.regressed {
+        background: #555555;
+      }
+
+      /* ── ZX graph comparison ──────────────────────────────────────────────── */
+      .zx-graphs-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+      }
+
+      .zx-graph-panel {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .zx-graph-header {
+        padding: 0.6rem 1rem;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--surface);
+        flex-shrink: 0;
+      }
+
+      .zx-graph-title {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .zx-node-count {
+        font-size: 0.72rem;
+        font-family: var(--mono);
+        color: var(--muted);
+      }
+
+      .zx-graph-container {
+        overflow: auto;
+        min-height: 160px;
+        background: #ffffff;
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .zx-graph-container svg {
+        display: block;
+      }
+
+      .zx-legend {
+        display: flex;
+        gap: 1rem;
+        padding: 0.5rem 1rem;
+        border-top: 1px solid var(--border);
+        flex-wrap: wrap;
+        background: var(--surface);
+      }
+
+      .zx-legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        font-size: 0.7rem;
+        color: var(--muted);
+      }
+
+      .zx-legend-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        border: 1.5px solid;
+        flex-shrink: 0;
+      }
+
+      @media (max-width: 680px) {
+        .zx-graphs-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* ── QASM output ──────────────────────────────────────────────────────── */
+      .qasm-output-wrap {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+      }
+
+      .qasm-output-header {
+        padding: 0.7rem 1.25rem;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: var(--surface);
+      }
+
+      .qasm-output-title {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: var(--muted);
+      }
+
+      .copy-btn {
+        background: var(--card);
+        border: 1px solid var(--border);
+        color: var(--muted);
+        border-radius: 6px;
+        padding: 0.25rem 0.7rem;
+        font-size: 0.75rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        transition: all 0.15s;
+      }
+
+      .copy-btn:hover {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+      .copy-btn.copied {
+        border-color: var(--success);
+        color: var(--success);
+      }
+
+      #qasm-output {
+        margin: 0;
+        padding: 1rem 1.25rem;
+        background: var(--code-bg);
+        color: #111111;
+        font-family: var(--mono);
+        font-size: 0.8rem;
+        line-height: 1.65;
+        overflow-x: auto;
+        white-space: pre;
+        max-height: 400px;
+        overflow-y: auto;
+      }
+
+      /* ── Error toast ──────────────────────────────────────────────────────── */
+      #error-toast {
+        position: fixed;
+        bottom: 1.5rem;
+        left: 50%;
+        transform: translateX(-50%) translateY(120px);
+        background: #f5f5f5;
+        border: 1px solid #111111;
+        color: #111111;
+        border-radius: var(--radius);
+        padding: 0.75rem 1.25rem;
+        font-size: 0.85rem;
+        max-width: 600px;
+        width: calc(100% - 3rem);
+        display: flex;
+        align-items: flex-start;
+        gap: 0.6rem;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        z-index: 100;
+      }
+
+      #error-toast.show {
+        transform: translateX(-50%) translateY(0);
+      }
+
+      .toast-icon {
+        flex-shrink: 0;
+        font-size: 1rem;
+        margin-top: 1px;
+      }
+      .toast-msg {
+        flex: 1;
+        line-height: 1.5;
+        word-break: break-word;
+      }
+      .toast-close {
+        flex-shrink: 0;
+        background: none;
+        border: none;
+        color: #111111;
+        cursor: pointer;
+        font-size: 1rem;
+        opacity: 0.7;
+        padding: 0;
+        line-height: 1;
+      }
+      .toast-close:hover {
+        opacity: 1;
+      }
+
+      /* ── Scrollbar ────────────────────────────────────────────────────────── */
+      ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 3px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: var(--muted);
+      }
+
+      /* ── Responsive ───────────────────────────────────────────────────────── */
+      @media (max-width: 680px) {
+        header {
+          padding: 1rem;
+        }
+        main {
+          padding: 1rem 1rem 3rem;
+        }
+        .metrics-grid {
+          grid-template-columns: 1fr;
+        }
+        .header-meta {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo">
+        <div class="logo-icon">⚛</div>
+        <span class="logo-text">ZX<span>Scope</span></span>
+      </div>
+      <div class="header-meta">
+        <span class="badge">pyzx</span>
+        <span>ZX-calculus circuit optimizer</span>
+      </div>
+    </header>
+
+    <main>
+      <!-- ── Input panel ───────────────────────────────────────────────────── -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Input Circuit</span>
+        </div>
+
+        <div class="preset-bar">
+          <span class="preset-label">Presets:</span>
+          <button class="preset-btn" data-preset="toffoli">Toffoli gate</button>
+          <button class="preset-btn" data-preset="qft3">3-qubit QFT</button>
+          <button class="preset-btn" data-preset="clifford_t">
+            Clifford+T adder
+          </button>
+        </div>
+
+        <div class="editor-wrap">
+          <textarea
+            id="qasm-input"
+            spellcheck="false"
+            placeholder='Paste OpenQASM 2.0 here…
 
 OPENQASM 2.0;
-include &quot;qelib1.inc&quot;;
+include "qelib1.inc";
 qreg q[3];
 h q[0];
 cx q[0],q[1];
 t q[1];
-…"></textarea>
-    </div>
-
-    <div class="editor-actions">
-      <label class="btn-ghost" title="Upload .qasm file">
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2zm-.5 4V4h1v2h2l-2.5 3L6 6h2z"/>
-        </svg>
-        Upload .qasm
-        <input type="file" id="file-upload" accept=".qasm,.txt,text/plain">
-      </label>
-      <button class="btn-ghost" id="clear-btn" title="Clear editor">
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-        Clear
-      </button>
-      <span class="char-count" id="char-count">0 chars</span>
-    </div>
-  </div>
-
-  <button id="optimize-btn">
-    <div class="spinner" id="spinner"></div>
-    <span id="btn-label">⚡ Optimize Circuit</span>
-  </button>
-
-  <!-- ── Results ────────────────────────────────────────────────────────── -->
-  <div id="results">
-
-    <p class="section-heading">Optimization results</p>
-
-    <!-- Metric cards -->
-    <div class="metrics-grid">
-      <div class="metric-card" id="card-gates">
-        <div class="metric-label">Gate count</div>
-        <div class="metric-value" id="val-gates">—</div>
-        <div class="metric-detail">
-          <span class="metric-before" id="before-gates"></span>
-          <span class="metric-pct" id="pct-gates"></span>
-        </div>
-        <div class="metric-bar"><div class="metric-bar-fill" id="bar-gates"></div></div>
-      </div>
-
-      <div class="metric-card" id="card-t">
-        <div class="metric-label">T-count</div>
-        <div class="metric-value" id="val-t">—</div>
-        <div class="metric-detail">
-          <span class="metric-before" id="before-t"></span>
-          <span class="metric-pct" id="pct-t"></span>
-        </div>
-        <div class="metric-bar"><div class="metric-bar-fill" id="bar-t"></div></div>
-      </div>
-
-      <div class="metric-card" id="card-depth">
-        <div class="metric-label">Depth</div>
-        <div class="metric-value" id="val-depth">—</div>
-        <div class="metric-detail">
-          <span class="metric-before" id="before-depth"></span>
-          <span class="metric-pct" id="pct-depth"></span>
-        </div>
-        <div class="metric-bar"><div class="metric-bar-fill" id="bar-depth"></div></div>
-      </div>
-    </div>
-
-    <!-- ZX graphs — before & after -->
-    <div>
-      <p class="section-heading">ZX graph comparison</p>
-      <div class="zx-graphs-grid">
-
-        <div class="zx-graph-panel">
-          <div class="zx-graph-header">
-            <span class="zx-graph-title">Before</span>
-            <span class="zx-node-count" id="before-node-count"></span>
-          </div>
-          <div id="before-graph-container" class="zx-graph-container"></div>
-          <div class="zx-legend">
-            <span class="zx-legend-item"><span class="zx-legend-dot" style="background:#d4f0d4;border-color:#2a7a2a"></span>Z spider</span>
-            <span class="zx-legend-item"><span class="zx-legend-dot" style="background:#f0d4d4;border-color:#aa2a2a"></span>X spider</span>
-            <span class="zx-legend-item"><span class="zx-legend-dot" style="background:#333;border-color:#333;border-radius:50%"></span>Boundary</span>
-            <span class="zx-legend-item"><span style="display:inline-block;width:10px;height:10px;background:#ffee00;border:1.5px solid #999900;border-radius:2px;flex-shrink:0"></span>H</span>
-          </div>
+…'
+          ></textarea>
         </div>
 
-        <div class="zx-graph-panel">
-          <div class="zx-graph-header">
-            <span class="zx-graph-title">After (reduced)</span>
-            <span class="zx-node-count" id="after-node-count"></span>
-          </div>
-          <div id="after-graph-container" class="zx-graph-container"></div>
-          <div class="zx-legend">
-            <span class="zx-legend-item"><span class="zx-legend-dot" style="background:#d4f0d4;border-color:#2a7a2a"></span>Z spider</span>
-            <span class="zx-legend-item"><span class="zx-legend-dot" style="background:#f0d4d4;border-color:#aa2a2a"></span>X spider</span>
-            <span class="zx-legend-item"><span class="zx-legend-dot" style="background:#333;border-color:#333;border-radius:50%"></span>Boundary</span>
-            <span class="zx-legend-item"><span style="display:inline-block;width:10px;height:10px;background:#ffee00;border:1.5px solid #999900;border-radius:2px;flex-shrink:0"></span>H</span>
-          </div>
-        </div>
-
-      </div>
-    </div>
-
-    <!-- Optimized QASM -->
-    <div>
-      <p class="section-heading">Optimized QASM</p>
-      <div class="qasm-output-wrap">
-        <div class="qasm-output-header">
-          <span class="qasm-output-title">OpenQASM 2.0 — optimized circuit</span>
-          <button class="copy-btn" id="copy-btn">
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"/>
-              <path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"/>
+        <div class="editor-actions">
+          <label class="btn-ghost" title="Upload .qasm file">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor">
+              <path
+                d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2zm-.5 4V4h1v2h2l-2.5 3L6 6h2z"
+              />
             </svg>
-            Copy
+            Upload .qasm
+            <input
+              type="file"
+              id="file-upload"
+              accept=".qasm,.txt,text/plain"
+            />
+          </label>
+          <button class="btn-ghost" id="clear-btn" title="Clear editor">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+              <path
+                d="M4 4l8 8M12 4l-8 8"
+                stroke="currentColor"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
+            </svg>
+            Clear
           </button>
+          <span class="char-count" id="char-count">0 chars</span>
         </div>
-        <pre id="qasm-output"></pre>
       </div>
+
+      <button id="optimize-btn">
+        <div class="spinner" id="spinner"></div>
+        <span id="btn-label">⚡ Optimize Circuit</span>
+      </button>
+
+      <!-- ── Results ────────────────────────────────────────────────────────── -->
+      <div id="results">
+        <p class="section-heading">Optimization results</p>
+
+        <!-- Metric cards -->
+        <div class="metrics-grid">
+          <div class="metric-card" id="card-gates">
+            <div class="metric-label">Gate count</div>
+            <div class="metric-value" id="val-gates">—</div>
+            <div class="metric-detail">
+              <span class="metric-before" id="before-gates"></span>
+              <span class="metric-pct" id="pct-gates"></span>
+            </div>
+            <div class="metric-bar">
+              <div class="metric-bar-fill" id="bar-gates"></div>
+            </div>
+          </div>
+
+          <div class="metric-card" id="card-t">
+            <div class="metric-label">T-count</div>
+            <div class="metric-value" id="val-t">—</div>
+            <div class="metric-detail">
+              <span class="metric-before" id="before-t"></span>
+              <span class="metric-pct" id="pct-t"></span>
+            </div>
+            <div class="metric-bar">
+              <div class="metric-bar-fill" id="bar-t"></div>
+            </div>
+          </div>
+
+          <div class="metric-card" id="card-depth">
+            <div class="metric-label">Depth</div>
+            <div class="metric-value" id="val-depth">—</div>
+            <div class="metric-detail">
+              <span class="metric-before" id="before-depth"></span>
+              <span class="metric-pct" id="pct-depth"></span>
+            </div>
+            <div class="metric-bar">
+              <div class="metric-bar-fill" id="bar-depth"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ZX graphs — before & after -->
+        <div>
+          <p class="section-heading">ZX graph comparison</p>
+          <div class="zx-graphs-grid">
+            <div class="zx-graph-panel">
+              <div class="zx-graph-header">
+                <span class="zx-graph-title">Before</span>
+                <span class="zx-node-count" id="before-node-count"></span>
+              </div>
+              <div id="before-graph-container" class="zx-graph-container"></div>
+              <div class="zx-legend">
+                <span class="zx-legend-item"
+                  ><span
+                    class="zx-legend-dot"
+                    style="background: #d4f0d4; border-color: #2a7a2a"
+                  ></span
+                  >Z spider</span
+                >
+                <span class="zx-legend-item"
+                  ><span
+                    class="zx-legend-dot"
+                    style="background: #f0d4d4; border-color: #aa2a2a"
+                  ></span
+                  >X spider</span
+                >
+                <span class="zx-legend-item"
+                  ><span
+                    class="zx-legend-dot"
+                    style="
+                      background: #333;
+                      border-color: #333;
+                      border-radius: 50%;
+                    "
+                  ></span
+                  >Boundary</span
+                >
+                <span class="zx-legend-item"
+                  ><span
+                    style="
+                      display: inline-block;
+                      width: 10px;
+                      height: 10px;
+                      background: #ffee00;
+                      border: 1.5px solid #999900;
+                      border-radius: 2px;
+                      flex-shrink: 0;
+                    "
+                  ></span
+                  >H</span
+                >
+              </div>
+            </div>
+
+            <div class="zx-graph-panel">
+              <div class="zx-graph-header">
+                <span class="zx-graph-title">After (reduced)</span>
+                <span class="zx-node-count" id="after-node-count"></span>
+              </div>
+              <div id="after-graph-container" class="zx-graph-container"></div>
+              <div class="zx-legend">
+                <span class="zx-legend-item"
+                  ><span
+                    class="zx-legend-dot"
+                    style="background: #d4f0d4; border-color: #2a7a2a"
+                  ></span
+                  >Z spider</span
+                >
+                <span class="zx-legend-item"
+                  ><span
+                    class="zx-legend-dot"
+                    style="background: #f0d4d4; border-color: #aa2a2a"
+                  ></span
+                  >X spider</span
+                >
+                <span class="zx-legend-item"
+                  ><span
+                    class="zx-legend-dot"
+                    style="
+                      background: #333;
+                      border-color: #333;
+                      border-radius: 50%;
+                    "
+                  ></span
+                  >Boundary</span
+                >
+                <span class="zx-legend-item"
+                  ><span
+                    style="
+                      display: inline-block;
+                      width: 10px;
+                      height: 10px;
+                      background: #ffee00;
+                      border: 1.5px solid #999900;
+                      border-radius: 2px;
+                      flex-shrink: 0;
+                    "
+                  ></span
+                  >H</span
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Optimized QASM -->
+        <div>
+          <p class="section-heading">Optimized QASM</p>
+          <div class="qasm-output-wrap">
+            <div class="qasm-output-header">
+              <span class="qasm-output-title"
+                >OpenQASM 2.0 — optimized circuit</span
+              >
+              <button class="copy-btn" id="copy-btn">
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 16 16"
+                  fill="currentColor"
+                >
+                  <path
+                    d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 0 1 0 1.5h-1.5a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-1.5a.75.75 0 0 1 1.5 0v1.5A1.75 1.75 0 0 1 9.25 16h-7.5A1.75 1.75 0 0 1 0 14.25Z"
+                  />
+                  <path
+                    d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0 1 14.25 11h-7.5A1.75 1.75 0 0 1 5 9.25Zm1.75-.25a.25.25 0 0 0-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 0 0 .25-.25v-7.5a.25.25 0 0 0-.25-.25Z"
+                  />
+                </svg>
+                Copy
+              </button>
+            </div>
+            <pre id="qasm-output"></pre>
+          </div>
+        </div>
+      </div>
+      <!-- /results -->
+    </main>
+
+    <!-- ── Error toast ──────────────────────────────────────────────────────── -->
+    <div id="error-toast">
+      <span class="toast-icon">⚠</span>
+      <span class="toast-msg" id="toast-msg"></span>
+      <button class="toast-close" id="toast-close">✕</button>
     </div>
 
-  </div><!-- /results -->
+    <script>
+      const BACKEND_URL =
+        "http://localhost:8000https://web-production-8f556.up.railway.app/";
 
-</main>
-
-<!-- ── Error toast ──────────────────────────────────────────────────────── -->
-<div id="error-toast">
-  <span class="toast-icon">⚠</span>
-  <span class="toast-msg" id="toast-msg"></span>
-  <button class="toast-close" id="toast-close">✕</button>
-</div>
-
-<script>
-// Change this to your Railway/Render URL before deploying
-const BACKEND_URL = 'http://localhost:8000';
-
-// ── Preset circuits ─────────────────────────────────────────────────────
-const PRESETS = {
-  toffoli: `OPENQASM 2.0;
+      // ── Preset circuits ─────────────────────────────────────────────────────
+      const PRESETS = {
+        toffoli: `OPENQASM 2.0;
 include "qelib1.inc";
 qreg q[3];
 h q[2];
@@ -765,7 +961,7 @@ t q[0];
 tdg q[1];
 cx q[0],q[1];`,
 
-  qft3: `OPENQASM 2.0;
+        qft3: `OPENQASM 2.0;
 include "qelib1.inc";
 qreg q[3];
 h q[0];
@@ -787,7 +983,7 @@ s q[2];
 h q[2];
 swap q[0],q[2];`,
 
-  clifford_t: `OPENQASM 2.0;
+        clifford_t: `OPENQASM 2.0;
 include "qelib1.inc";
 qreg q[4];
 cx q[0],q[3];
@@ -814,424 +1010,465 @@ tdg q[2];
 tdg q[3];
 cx q[0],q[3];
 cx q[1],q[3];
-h q[3];`
-};
+h q[3];`,
+      };
 
-// ── DOM refs ─────────────────────────────────────────────────────────────
-const textarea    = document.getElementById('qasm-input');
-const charCount   = document.getElementById('char-count');
-const optimizeBtn = document.getElementById('optimize-btn');
-const btnLabel    = document.getElementById('btn-label');
-const spinner     = document.getElementById('spinner');
-const results     = document.getElementById('results');
-const fileUpload  = document.getElementById('file-upload');
-const clearBtn    = document.getElementById('clear-btn');
-const copyBtn     = document.getElementById('copy-btn');
-const errorToast  = document.getElementById('error-toast');
-const toastMsg    = document.getElementById('toast-msg');
-const toastClose  = document.getElementById('toast-close');
+      // ── DOM refs ─────────────────────────────────────────────────────────────
+      const textarea = document.getElementById("qasm-input");
+      const charCount = document.getElementById("char-count");
+      const optimizeBtn = document.getElementById("optimize-btn");
+      const btnLabel = document.getElementById("btn-label");
+      const spinner = document.getElementById("spinner");
+      const results = document.getElementById("results");
+      const fileUpload = document.getElementById("file-upload");
+      const clearBtn = document.getElementById("clear-btn");
+      const copyBtn = document.getElementById("copy-btn");
+      const errorToast = document.getElementById("error-toast");
+      const toastMsg = document.getElementById("toast-msg");
+      const toastClose = document.getElementById("toast-close");
 
-// ── Char counter ─────────────────────────────────────────────────────────
-textarea.addEventListener('input', () => {
-  charCount.textContent = `${textarea.value.length.toLocaleString()} chars`;
-});
+      // ── Char counter ─────────────────────────────────────────────────────────
+      textarea.addEventListener("input", () => {
+        charCount.textContent = `${textarea.value.length.toLocaleString()} chars`;
+      });
 
-// ── Presets ───────────────────────────────────────────────────────────────
-document.querySelectorAll('.preset-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const key = btn.dataset.preset;
-    textarea.value = PRESETS[key] ?? '';
-    charCount.textContent = `${textarea.value.length.toLocaleString()} chars`;
-    textarea.focus();
-  });
-});
+      // ── Presets ───────────────────────────────────────────────────────────────
+      document.querySelectorAll(".preset-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const key = btn.dataset.preset;
+          textarea.value = PRESETS[key] ?? "";
+          charCount.textContent = `${textarea.value.length.toLocaleString()} chars`;
+          textarea.focus();
+        });
+      });
 
-// ── File upload ───────────────────────────────────────────────────────────
-fileUpload.addEventListener('change', e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    textarea.value = ev.target.result;
-    charCount.textContent = `${textarea.value.length.toLocaleString()} chars`;
-  };
-  reader.readAsText(file);
-  fileUpload.value = '';
-});
+      // ── File upload ───────────────────────────────────────────────────────────
+      fileUpload.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          textarea.value = ev.target.result;
+          charCount.textContent = `${textarea.value.length.toLocaleString()} chars`;
+        };
+        reader.readAsText(file);
+        fileUpload.value = "";
+      });
 
-// ── Clear ─────────────────────────────────────────────────────────────────
-clearBtn.addEventListener('click', () => {
-  textarea.value = '';
-  charCount.textContent = '0 chars';
-  textarea.focus();
-});
+      // ── Clear ─────────────────────────────────────────────────────────────────
+      clearBtn.addEventListener("click", () => {
+        textarea.value = "";
+        charCount.textContent = "0 chars";
+        textarea.focus();
+      });
 
-// ── Error toast ───────────────────────────────────────────────────────────
-let toastTimer = null;
+      // ── Error toast ───────────────────────────────────────────────────────────
+      let toastTimer = null;
 
-function showError(msg) {
-  toastMsg.textContent = msg;
-  errorToast.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(hideError, 7000);
-}
-
-function hideError() {
-  errorToast.classList.remove('show');
-}
-
-toastClose.addEventListener('click', hideError);
-
-// ── Loading state ─────────────────────────────────────────────────────────
-function setLoading(loading) {
-  optimizeBtn.disabled = loading;
-  spinner.style.display = loading ? 'block' : 'none';
-  btnLabel.textContent = loading ? 'Optimizing…' : '⚡ Optimize Circuit';
-}
-
-// ── Metric animation ──────────────────────────────────────────────────────
-function animateCount(el, target, duration = 600) {
-  const start = performance.now();
-  const from = 0;
-  function tick(now) {
-    const progress = Math.min((now - start) / duration, 1);
-    const ease = 1 - Math.pow(1 - progress, 3);
-    el.textContent = Math.round(from + (target - from) * ease);
-    if (progress < 1) requestAnimationFrame(tick);
-    else el.textContent = target;
-  }
-  requestAnimationFrame(tick);
-}
-
-function pctChange(before, after) {
-  if (before === 0) return { text: '—', cls: 'unchanged' };
-  const delta = after - before;
-  if (delta === 0) return { text: '±0%', cls: 'unchanged' };
-  const pct = Math.round((Math.abs(delta) / before) * 100);
-  if (delta < 0) return { text: `−${pct}%`, cls: 'improved' };
-  return { text: `+${pct}%`, cls: 'regressed' };
-}
-
-function renderMetric(opts) {
-  const { cardId, valId, beforeId, pctId, barId, before, after, delay } = opts;
-  const card     = document.getElementById(cardId);
-  const valEl    = document.getElementById(valId);
-  const beforeEl = document.getElementById(beforeId);
-  const pctEl    = document.getElementById(pctId);
-  const barEl    = document.getElementById(barId);
-
-  const { text, cls } = pctChange(before, after);
-  const ratio = before > 0 ? (after / before) : 1;
-
-  beforeEl.textContent = `was ${before}`;
-  pctEl.textContent = text;
-  pctEl.className = `metric-pct ${cls}`;
-
-  const isImproved = cls === 'improved';
-  barEl.className = `metric-bar-fill${isImproved ? '' : cls === 'regressed' ? ' regressed' : ''}`;
-
-  setTimeout(() => {
-    card.classList.add('animate');
-    animateCount(valEl, after, 700);
-    // Delay bar animation slightly
-    setTimeout(() => {
-      // Bar fill = proportion of 'after' relative to 'before', capped [0,1]
-      const fillPct = Math.min(ratio * 100, 100);
-      barEl.style.width = `${fillPct}%`;
-    }, 200);
-  }, delay);
-}
-
-// ── Show results ──────────────────────────────────────────────────────────
-function showResults(data) {
-  // Reset card states
-  ['card-gates', 'card-t', 'card-depth'].forEach(id => {
-    document.getElementById(id).classList.remove('animate');
-  });
-  ['bar-gates', 'bar-t', 'bar-depth'].forEach(id => {
-    document.getElementById(id).style.width = '0';
-  });
-
-  results.classList.add('visible');
-
-  renderMetric({
-    cardId: 'card-gates', valId: 'val-gates',
-    beforeId: 'before-gates', pctId: 'pct-gates', barId: 'bar-gates',
-    before: data.before.gate_count, after: data.after.gate_count,
-    delay: 0,
-  });
-  renderMetric({
-    cardId: 'card-t', valId: 'val-t',
-    beforeId: 'before-t', pctId: 'pct-t', barId: 'bar-t',
-    before: data.before.t_count, after: data.after.t_count,
-    delay: 120,
-  });
-  renderMetric({
-    cardId: 'card-depth', valId: 'val-depth',
-    beforeId: 'before-depth', pctId: 'pct-depth', barId: 'bar-depth',
-    before: data.before.depth, after: data.after.depth,
-    delay: 240,
-  });
-
-  // ZX graphs
-  renderZXGraph(data.before_graph, document.getElementById('before-graph-container'),
-                document.getElementById('before-node-count'));
-  renderZXGraph(data.after_graph,  document.getElementById('after-graph-container'),
-                document.getElementById('after-node-count'));
-
-  // Optimized QASM
-  document.getElementById('qasm-output').textContent = data.optimized_qasm;
-
-  // Scroll to results
-  setTimeout(() => {
-    results.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, 100);
-}
-
-// ── ZX Graph SVG Renderer ─────────────────────────────────────────────────
-
-// pyzx vertex types
-const VT = { BOUNDARY: 0, Z: 1, X: 2, H_BOX: 3 };
-// pyzx edge types
-const ET = { SIMPLE: 1, HADAMARD: 2 };
-
-const NODE_STYLES = {
-  [VT.BOUNDARY]: { r: 5,  fill: '#333333', stroke: 'none'    },
-  [VT.Z]:        { r: 16, fill: '#d4f0d4', stroke: '#2a7a2a' },
-  [VT.X]:        { r: 16, fill: '#f0d4d4', stroke: '#aa2a2a' },
-  [VT.H_BOX]:   { r: 0,  fill: '#ffee00', stroke: '#999900' },
-};
-
-function formatPhase(phase) {
-  if (!phase || phase === '0') return '';
-  if (phase === '1') return 'π';            // π
-  const slash = phase.indexOf('/');
-  if (slash === -1) return phase + 'π';
-  const num = phase.slice(0, slash);
-  const den = phase.slice(slash + 1);
-  return (num === '1' ? '' : num) + 'π/' + den;
-}
-
-function renderZXGraph(graphData, container, countEl) {
-  container.innerHTML = '';
-
-  const { nodes, edges } = graphData;
-  if (!nodes || nodes.length === 0) {
-    container.innerHTML = '<div style="padding:2rem;text-align:center;color:#aaa;font-size:0.8rem">Empty graph</div>';
-    if (countEl) countEl.textContent = '';
-    return;
-  }
-
-  const spiderCount = nodes.filter(n => n.type === VT.Z || n.type === VT.X).length;
-  if (countEl) countEl.textContent = `${spiderCount} spiders · ${edges.length} edges`;
-
-  // Layout constants
-  const SCALE_X = 72;   // px per row step
-  const SCALE_Y = 64;   // px per qubit step
-  const PAD     = 44;
-  const NODE_R  = 16;
-  const H_SZ    = 20;   // H-box side length
-
-  const rows   = nodes.map(n => n.row);
-  const qubits = nodes.map(n => n.qubit);
-  const minRow = Math.min(...rows),  maxRow = Math.max(...rows);
-  const minQ   = Math.min(...qubits), maxQ  = Math.max(...qubits);
-
-  const rowSpan   = maxRow - minRow || 1;
-  const qubitSpan = maxQ   - minQ   || 1;
-
-  const W = Math.max(280, rowSpan   * SCALE_X + PAD * 2);
-  const H = Math.max(130, qubitSpan * SCALE_Y + PAD * 2);
-
-  // Node positions
-  const pos = {};
-  nodes.forEach(n => {
-    pos[n.id] = {
-      x: PAD + (n.row   - minRow) * SCALE_X,
-      y: PAD + (n.qubit - minQ)   * SCALE_Y,
-    };
-  });
-
-  const ns  = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(ns, 'svg');
-  svg.setAttribute('width',   W);
-  svg.setAttribute('height',  H);
-  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-  svg.style.cssText = 'display:block;background:#ffffff;';
-
-  // ── Edges ─────────────────────────────────────────────────────────────
-  const edgeLayer = document.createElementNS(ns, 'g');
-
-  edges.forEach(e => {
-    const from = pos[e.src], to = pos[e.tgt];
-    if (!from || !to) return;
-
-    const isH = e.type === ET.HADAMARD;
-
-    const line = document.createElementNS(ns, 'line');
-    line.setAttribute('x1', from.x); line.setAttribute('y1', from.y);
-    line.setAttribute('x2', to.x);   line.setAttribute('y2', to.y);
-    line.setAttribute('stroke', '#555555');
-    line.setAttribute('stroke-width', '1.5');
-    edgeLayer.appendChild(line);
-
-    if (isH) {
-      const mx = (from.x + to.x) / 2;
-      const my = (from.y + to.y) / 2;
-      const box = document.createElementNS(ns, 'rect');
-      box.setAttribute('x', mx - H_SZ / 2); box.setAttribute('y', my - H_SZ / 2);
-      box.setAttribute('width', H_SZ);      box.setAttribute('height', H_SZ);
-      box.setAttribute('fill', '#ffee00');
-      box.setAttribute('stroke', '#999900');
-      box.setAttribute('stroke-width', '1.5');
-      box.setAttribute('rx', '3');
-      edgeLayer.appendChild(box);
-
-      const ht = document.createElementNS(ns, 'text');
-      ht.setAttribute('x', mx); ht.setAttribute('y', my + 4);
-      ht.setAttribute('text-anchor', 'middle');
-      ht.setAttribute('font-size', '10');
-      ht.setAttribute('font-family', 'monospace');
-      ht.setAttribute('font-weight', '700');
-      ht.setAttribute('fill', '#666600');
-      ht.textContent = 'H';
-      edgeLayer.appendChild(ht);
-    }
-  });
-
-  svg.appendChild(edgeLayer);
-
-  // ── Nodes ─────────────────────────────────────────────────────────────
-  const nodeLayer = document.createElementNS(ns, 'g');
-
-  nodes.forEach(n => {
-    const p = pos[n.id];
-    if (!p) return;
-
-    const style = NODE_STYLES[n.type] ?? NODE_STYLES[VT.BOUNDARY];
-    const phase = formatPhase(n.phase);
-    const g = document.createElementNS(ns, 'g');
-
-    if (n.type === VT.BOUNDARY) {
-      const c = document.createElementNS(ns, 'circle');
-      c.setAttribute('cx', p.x); c.setAttribute('cy', p.y);
-      c.setAttribute('r', style.r);
-      c.setAttribute('fill', style.fill);
-      g.appendChild(c);
-
-    } else if (n.type === VT.H_BOX) {
-      const rect = document.createElementNS(ns, 'rect');
-      rect.setAttribute('x', p.x - H_SZ / 2); rect.setAttribute('y', p.y - H_SZ / 2);
-      rect.setAttribute('width', H_SZ);        rect.setAttribute('height', H_SZ);
-      rect.setAttribute('fill', style.fill);
-      rect.setAttribute('stroke', style.stroke);
-      rect.setAttribute('stroke-width', '2');
-      rect.setAttribute('rx', '3');
-      g.appendChild(rect);
-
-      const t = document.createElementNS(ns, 'text');
-      t.setAttribute('x', p.x); t.setAttribute('y', p.y + 4);
-      t.setAttribute('text-anchor', 'middle');
-      t.setAttribute('font-size', '10'); t.setAttribute('font-weight', '700');
-      t.setAttribute('font-family', 'monospace'); t.setAttribute('fill', '#555500');
-      t.textContent = 'H';
-      g.appendChild(t);
-
-    } else {
-      // Z or X spider
-      const c = document.createElementNS(ns, 'circle');
-      c.setAttribute('cx', p.x); c.setAttribute('cy', p.y);
-      c.setAttribute('r', NODE_R);
-      c.setAttribute('fill', style.fill);
-      c.setAttribute('stroke', style.stroke);
-      c.setAttribute('stroke-width', '2');
-      g.appendChild(c);
-
-      if (phase) {
-        const t = document.createElementNS(ns, 'text');
-        t.setAttribute('x', p.x);
-        // If phase label is long, push it outside the circle
-        const inside = phase.length <= 4;
-        t.setAttribute('y', inside ? p.y + 4 : p.y - NODE_R - 4);
-        t.setAttribute('text-anchor', 'middle');
-        t.setAttribute('font-size', inside ? '9' : '10');
-        t.setAttribute('font-family', 'monospace');
-        t.setAttribute('fill', inside ? '#333333' : '#555555');
-        t.textContent = phase;
-        g.appendChild(t);
+      function showError(msg) {
+        toastMsg.textContent = msg;
+        errorToast.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(hideError, 7000);
       }
-    }
 
-    nodeLayer.appendChild(g);
-  });
+      function hideError() {
+        errorToast.classList.remove("show");
+      }
 
-  svg.appendChild(nodeLayer);
-  container.appendChild(svg);
-}
+      toastClose.addEventListener("click", hideError);
 
-// ── Optimize ──────────────────────────────────────────────────────────────
-async function optimize() {
-  const qasm = textarea.value.trim();
-  if (!qasm) {
-    showError('Paste or upload a QASM circuit first.');
-    return;
-  }
+      // ── Loading state ─────────────────────────────────────────────────────────
+      function setLoading(loading) {
+        optimizeBtn.disabled = loading;
+        spinner.style.display = loading ? "block" : "none";
+        btnLabel.textContent = loading ? "Optimizing…" : "⚡ Optimize Circuit";
+      }
 
-  setLoading(true);
-  try {
-    const res = await fetch(`${BACKEND_URL}/optimize`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ qasm }),
-    });
+      // ── Metric animation ──────────────────────────────────────────────────────
+      function animateCount(el, target, duration = 600) {
+        const start = performance.now();
+        const from = 0;
+        function tick(now) {
+          const progress = Math.min((now - start) / duration, 1);
+          const ease = 1 - Math.pow(1 - progress, 3);
+          el.textContent = Math.round(from + (target - from) * ease);
+          if (progress < 1) requestAnimationFrame(tick);
+          else el.textContent = target;
+        }
+        requestAnimationFrame(tick);
+      }
 
-    if (!res.ok) {
-      let detail = `Server returned ${res.status}`;
-      try { detail = (await res.json()).detail ?? detail; } catch {}
-      throw new Error(detail);
-    }
+      function pctChange(before, after) {
+        if (before === 0) return { text: "—", cls: "unchanged" };
+        const delta = after - before;
+        if (delta === 0) return { text: "±0%", cls: "unchanged" };
+        const pct = Math.round((Math.abs(delta) / before) * 100);
+        if (delta < 0) return { text: `−${pct}%`, cls: "improved" };
+        return { text: `+${pct}%`, cls: "regressed" };
+      }
 
-    const data = await res.json();
-    showResults(data);
-  } catch (err) {
-    if (err.name === 'TypeError') {
-      showError(`Cannot reach backend at ${BACKEND_URL}. Is uvicorn running?`);
-    } else {
-      showError(err.message);
-    }
-  } finally {
-    setLoading(false);
-  }
-}
+      function renderMetric(opts) {
+        const { cardId, valId, beforeId, pctId, barId, before, after, delay } =
+          opts;
+        const card = document.getElementById(cardId);
+        const valEl = document.getElementById(valId);
+        const beforeEl = document.getElementById(beforeId);
+        const pctEl = document.getElementById(pctId);
+        const barEl = document.getElementById(barId);
 
-optimizeBtn.addEventListener('click', optimize);
+        const { text, cls } = pctChange(before, after);
+        const ratio = before > 0 ? after / before : 1;
 
-// Ctrl/Cmd+Enter shortcut
-textarea.addEventListener('keydown', e => {
-  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') optimize();
-});
+        beforeEl.textContent = `was ${before}`;
+        pctEl.textContent = text;
+        pctEl.className = `metric-pct ${cls}`;
 
-// ── Copy button ───────────────────────────────────────────────────────────
-copyBtn.addEventListener('click', async () => {
-  const text = document.getElementById('qasm-output').textContent;
-  if (!text) return;
-  try {
-    await navigator.clipboard.writeText(text);
-    copyBtn.classList.add('copied');
-    copyBtn.querySelector('svg').style.display = 'none';
-    const orig = copyBtn.childNodes[copyBtn.childNodes.length - 1];
-    const span = document.createElement('span');
-    span.textContent = ' Copied!';
-    copyBtn.appendChild(span);
-    setTimeout(() => {
-      copyBtn.classList.remove('copied');
-      copyBtn.querySelector('svg').style.display = '';
-      span.remove();
-    }, 2000);
-  } catch {
-    showError('Copy failed — please select and copy the text manually.');
-  }
-});
-</script>
-</body>
+        const isImproved = cls === "improved";
+        barEl.className = `metric-bar-fill${isImproved ? "" : cls === "regressed" ? " regressed" : ""}`;
+
+        setTimeout(() => {
+          card.classList.add("animate");
+          animateCount(valEl, after, 700);
+          // Delay bar animation slightly
+          setTimeout(() => {
+            // Bar fill = proportion of 'after' relative to 'before', capped [0,1]
+            const fillPct = Math.min(ratio * 100, 100);
+            barEl.style.width = `${fillPct}%`;
+          }, 200);
+        }, delay);
+      }
+
+      // ── Show results ──────────────────────────────────────────────────────────
+      function showResults(data) {
+        // Reset card states
+        ["card-gates", "card-t", "card-depth"].forEach((id) => {
+          document.getElementById(id).classList.remove("animate");
+        });
+        ["bar-gates", "bar-t", "bar-depth"].forEach((id) => {
+          document.getElementById(id).style.width = "0";
+        });
+
+        results.classList.add("visible");
+
+        renderMetric({
+          cardId: "card-gates",
+          valId: "val-gates",
+          beforeId: "before-gates",
+          pctId: "pct-gates",
+          barId: "bar-gates",
+          before: data.before.gate_count,
+          after: data.after.gate_count,
+          delay: 0,
+        });
+        renderMetric({
+          cardId: "card-t",
+          valId: "val-t",
+          beforeId: "before-t",
+          pctId: "pct-t",
+          barId: "bar-t",
+          before: data.before.t_count,
+          after: data.after.t_count,
+          delay: 120,
+        });
+        renderMetric({
+          cardId: "card-depth",
+          valId: "val-depth",
+          beforeId: "before-depth",
+          pctId: "pct-depth",
+          barId: "bar-depth",
+          before: data.before.depth,
+          after: data.after.depth,
+          delay: 240,
+        });
+
+        // ZX graphs
+        renderZXGraph(
+          data.before_graph,
+          document.getElementById("before-graph-container"),
+          document.getElementById("before-node-count"),
+        );
+        renderZXGraph(
+          data.after_graph,
+          document.getElementById("after-graph-container"),
+          document.getElementById("after-node-count"),
+        );
+
+        // Optimized QASM
+        document.getElementById("qasm-output").textContent =
+          data.optimized_qasm;
+
+        // Scroll to results
+        setTimeout(() => {
+          results.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 100);
+      }
+
+      // ── ZX Graph SVG Renderer ─────────────────────────────────────────────────
+
+      // pyzx vertex types
+      const VT = { BOUNDARY: 0, Z: 1, X: 2, H_BOX: 3 };
+      // pyzx edge types
+      const ET = { SIMPLE: 1, HADAMARD: 2 };
+
+      const NODE_STYLES = {
+        [VT.BOUNDARY]: { r: 5, fill: "#333333", stroke: "none" },
+        [VT.Z]: { r: 16, fill: "#d4f0d4", stroke: "#2a7a2a" },
+        [VT.X]: { r: 16, fill: "#f0d4d4", stroke: "#aa2a2a" },
+        [VT.H_BOX]: { r: 0, fill: "#ffee00", stroke: "#999900" },
+      };
+
+      function formatPhase(phase) {
+        if (!phase || phase === "0") return "";
+        if (phase === "1") return "π"; // π
+        const slash = phase.indexOf("/");
+        if (slash === -1) return phase + "π";
+        const num = phase.slice(0, slash);
+        const den = phase.slice(slash + 1);
+        return (num === "1" ? "" : num) + "π/" + den;
+      }
+
+      function renderZXGraph(graphData, container, countEl) {
+        container.innerHTML = "";
+
+        const { nodes, edges } = graphData;
+        if (!nodes || nodes.length === 0) {
+          container.innerHTML =
+            '<div style="padding:2rem;text-align:center;color:#aaa;font-size:0.8rem">Empty graph</div>';
+          if (countEl) countEl.textContent = "";
+          return;
+        }
+
+        const spiderCount = nodes.filter(
+          (n) => n.type === VT.Z || n.type === VT.X,
+        ).length;
+        if (countEl)
+          countEl.textContent = `${spiderCount} spiders · ${edges.length} edges`;
+
+        // Layout constants
+        const SCALE_X = 72; // px per row step
+        const SCALE_Y = 64; // px per qubit step
+        const PAD = 44;
+        const NODE_R = 16;
+        const H_SZ = 20; // H-box side length
+
+        const rows = nodes.map((n) => n.row);
+        const qubits = nodes.map((n) => n.qubit);
+        const minRow = Math.min(...rows),
+          maxRow = Math.max(...rows);
+        const minQ = Math.min(...qubits),
+          maxQ = Math.max(...qubits);
+
+        const rowSpan = maxRow - minRow || 1;
+        const qubitSpan = maxQ - minQ || 1;
+
+        const W = Math.max(280, rowSpan * SCALE_X + PAD * 2);
+        const H = Math.max(130, qubitSpan * SCALE_Y + PAD * 2);
+
+        // Node positions
+        const pos = {};
+        nodes.forEach((n) => {
+          pos[n.id] = {
+            x: PAD + (n.row - minRow) * SCALE_X,
+            y: PAD + (n.qubit - minQ) * SCALE_Y,
+          };
+        });
+
+        const ns = "http://www.w3.org/2000/svg";
+        const svg = document.createElementNS(ns, "svg");
+        svg.setAttribute("width", W);
+        svg.setAttribute("height", H);
+        svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+        svg.style.cssText = "display:block;background:#ffffff;";
+
+        // ── Edges ─────────────────────────────────────────────────────────────
+        const edgeLayer = document.createElementNS(ns, "g");
+
+        edges.forEach((e) => {
+          const from = pos[e.src],
+            to = pos[e.tgt];
+          if (!from || !to) return;
+
+          const isH = e.type === ET.HADAMARD;
+
+          const line = document.createElementNS(ns, "line");
+          line.setAttribute("x1", from.x);
+          line.setAttribute("y1", from.y);
+          line.setAttribute("x2", to.x);
+          line.setAttribute("y2", to.y);
+          line.setAttribute("stroke", "#555555");
+          line.setAttribute("stroke-width", "1.5");
+          edgeLayer.appendChild(line);
+
+          if (isH) {
+            const mx = (from.x + to.x) / 2;
+            const my = (from.y + to.y) / 2;
+            const box = document.createElementNS(ns, "rect");
+            box.setAttribute("x", mx - H_SZ / 2);
+            box.setAttribute("y", my - H_SZ / 2);
+            box.setAttribute("width", H_SZ);
+            box.setAttribute("height", H_SZ);
+            box.setAttribute("fill", "#ffee00");
+            box.setAttribute("stroke", "#999900");
+            box.setAttribute("stroke-width", "1.5");
+            box.setAttribute("rx", "3");
+            edgeLayer.appendChild(box);
+
+            const ht = document.createElementNS(ns, "text");
+            ht.setAttribute("x", mx);
+            ht.setAttribute("y", my + 4);
+            ht.setAttribute("text-anchor", "middle");
+            ht.setAttribute("font-size", "10");
+            ht.setAttribute("font-family", "monospace");
+            ht.setAttribute("font-weight", "700");
+            ht.setAttribute("fill", "#666600");
+            ht.textContent = "H";
+            edgeLayer.appendChild(ht);
+          }
+        });
+
+        svg.appendChild(edgeLayer);
+
+        // ── Nodes ─────────────────────────────────────────────────────────────
+        const nodeLayer = document.createElementNS(ns, "g");
+
+        nodes.forEach((n) => {
+          const p = pos[n.id];
+          if (!p) return;
+
+          const style = NODE_STYLES[n.type] ?? NODE_STYLES[VT.BOUNDARY];
+          const phase = formatPhase(n.phase);
+          const g = document.createElementNS(ns, "g");
+
+          if (n.type === VT.BOUNDARY) {
+            const c = document.createElementNS(ns, "circle");
+            c.setAttribute("cx", p.x);
+            c.setAttribute("cy", p.y);
+            c.setAttribute("r", style.r);
+            c.setAttribute("fill", style.fill);
+            g.appendChild(c);
+          } else if (n.type === VT.H_BOX) {
+            const rect = document.createElementNS(ns, "rect");
+            rect.setAttribute("x", p.x - H_SZ / 2);
+            rect.setAttribute("y", p.y - H_SZ / 2);
+            rect.setAttribute("width", H_SZ);
+            rect.setAttribute("height", H_SZ);
+            rect.setAttribute("fill", style.fill);
+            rect.setAttribute("stroke", style.stroke);
+            rect.setAttribute("stroke-width", "2");
+            rect.setAttribute("rx", "3");
+            g.appendChild(rect);
+
+            const t = document.createElementNS(ns, "text");
+            t.setAttribute("x", p.x);
+            t.setAttribute("y", p.y + 4);
+            t.setAttribute("text-anchor", "middle");
+            t.setAttribute("font-size", "10");
+            t.setAttribute("font-weight", "700");
+            t.setAttribute("font-family", "monospace");
+            t.setAttribute("fill", "#555500");
+            t.textContent = "H";
+            g.appendChild(t);
+          } else {
+            // Z or X spider
+            const c = document.createElementNS(ns, "circle");
+            c.setAttribute("cx", p.x);
+            c.setAttribute("cy", p.y);
+            c.setAttribute("r", NODE_R);
+            c.setAttribute("fill", style.fill);
+            c.setAttribute("stroke", style.stroke);
+            c.setAttribute("stroke-width", "2");
+            g.appendChild(c);
+
+            if (phase) {
+              const t = document.createElementNS(ns, "text");
+              t.setAttribute("x", p.x);
+              // If phase label is long, push it outside the circle
+              const inside = phase.length <= 4;
+              t.setAttribute("y", inside ? p.y + 4 : p.y - NODE_R - 4);
+              t.setAttribute("text-anchor", "middle");
+              t.setAttribute("font-size", inside ? "9" : "10");
+              t.setAttribute("font-family", "monospace");
+              t.setAttribute("fill", inside ? "#333333" : "#555555");
+              t.textContent = phase;
+              g.appendChild(t);
+            }
+          }
+
+          nodeLayer.appendChild(g);
+        });
+
+        svg.appendChild(nodeLayer);
+        container.appendChild(svg);
+      }
+
+      // ── Optimize ──────────────────────────────────────────────────────────────
+      async function optimize() {
+        const qasm = textarea.value.trim();
+        if (!qasm) {
+          showError("Paste or upload a QASM circuit first.");
+          return;
+        }
+
+        setLoading(true);
+        try {
+          const res = await fetch(`${BACKEND_URL}/optimize`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ qasm }),
+          });
+
+          if (!res.ok) {
+            let detail = `Server returned ${res.status}`;
+            try {
+              detail = (await res.json()).detail ?? detail;
+            } catch {}
+            throw new Error(detail);
+          }
+
+          const data = await res.json();
+          showResults(data);
+        } catch (err) {
+          if (err.name === "TypeError") {
+            showError(
+              `Cannot reach backend at ${BACKEND_URL}. Is uvicorn running?`,
+            );
+          } else {
+            showError(err.message);
+          }
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      optimizeBtn.addEventListener("click", optimize);
+
+      // Ctrl/Cmd+Enter shortcut
+      textarea.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") optimize();
+      });
+
+      // ── Copy button ───────────────────────────────────────────────────────────
+      copyBtn.addEventListener("click", async () => {
+        const text = document.getElementById("qasm-output").textContent;
+        if (!text) return;
+        try {
+          await navigator.clipboard.writeText(text);
+          copyBtn.classList.add("copied");
+          copyBtn.querySelector("svg").style.display = "none";
+          const orig = copyBtn.childNodes[copyBtn.childNodes.length - 1];
+          const span = document.createElement("span");
+          span.textContent = " Copied!";
+          copyBtn.appendChild(span);
+          setTimeout(() => {
+            copyBtn.classList.remove("copied");
+            copyBtn.querySelector("svg").style.display = "";
+            span.remove();
+          }, 2000);
+        } catch {
+          showError("Copy failed — please select and copy the text manually.");
+        }
+      });
+    </script>
+  </body>
 </html>
