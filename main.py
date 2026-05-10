@@ -2,6 +2,7 @@ import pyzx as zx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from fractions import Fraction
 
 app = FastAPI(title="ZXScope", version="1.0.0")
 
@@ -41,11 +42,18 @@ class OptimizeResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 _T_NAMES = {"T", "Tdg", "T†", "T_Conj", "Tdag"}
-
+_T_PHASES = {Fraction(1, 4), Fraction(7, 4)}
 
 def _t_count(circuit) -> int:
-    return sum(1 for g in circuit.gates if type(g).__name__ in _T_NAMES)
-
+    count = 0
+    for g in circuit.gates:
+        name = type(g).__name__
+        if name in ("T", "Tdg"):
+            count += 1
+        elif name in ("ZPhase", "XPhase") and hasattr(g, "phase"):
+            if g.phase in _T_PHASES:
+                count += 1
+    return count
 
 def _gate_depth(circuit) -> int:
     times: list[int] = [0] * circuit.qubits
