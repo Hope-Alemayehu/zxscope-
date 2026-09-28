@@ -937,7 +937,7 @@ t q[1];
     </div>
 
     <script>
-      const BACKEND_URL = "https://web-production-38815.up.railway.app";
+      const BACKEND_URL = "/api";
 
       // ── Preset circuits ─────────────────────────────────────────────────────
       const PRESETS = {
@@ -1430,7 +1430,7 @@ h q[3];`,
         } catch (err) {
           if (err.name === "TypeError") {
             showError(
-              `Cannot reach backend at ${BACKEND_URL}. Is uvicorn running?`,
+              "Cannot reach the optimizer backend. Please try again in a moment.",
             );
           } else {
             showError(err.message);
