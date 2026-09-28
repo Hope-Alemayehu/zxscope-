@@ -20,7 +20,7 @@ Then open <http://localhost:8000>. The root `main.py` is for local development o
 Everything runs on a single Vercel project:
 
 - `index.html` is served as a static file.
-- `api/index.py` (the FastAPI app) is deployed as a Python serverless function. `vercel.json` rewrites `/api/*` to it and allows up to 60 s per request.
+- `api/index.py` (the FastAPI app) is deployed as a Python serverless function. Vercel routes `/api/*` requests to it; `vercel.json` only sets a 60 s max duration.
 - `requirements.txt` holds the function's dependencies (FastAPI, pyzx). Keep it small so the function stays under Vercel's 250 MB limit.
 
 Push to `main` and Vercel redeploys. No separate backend host is needed.
